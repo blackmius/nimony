@@ -189,7 +189,7 @@
 | `(nilt)` | NimonyType | `nilt` type |
 | `(concept .X .X X S*)` | NimonyType, NiflerKind | `concept` type: two reserved slots, a typevar symbol and the concept body statements |
 | `(distinct T)` | NimonyType, NiflerKind | `distinct` type |
-| `(itertype . (params...) T)` | NimonyType, NiflerKind | `itertype` type |
+| `(itertype .Any (params...) T P)`; `(itertype ...)` | NimonyType, NiflerKind | `itertype` type, same as `proctype` |
 | `(rangetype T X X)` | NimonyType | `rangetype` type |
 | `(uarray T)` | NimonyType | `uarray` type |
 | `(set T)` | NimonyType | `set` type |

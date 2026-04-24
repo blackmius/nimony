@@ -63,7 +63,7 @@ proc skipToParams*(c: var Cursor) =
   ## Proc-decl layout: `(proc Name ExportMarker Pattern Typevars (params...) ...)`.
   let kind = c.typeKind
   inc c # skip ParLe
-  if kind == ProctypeT:
+  if kind in {ProctypeT, ItertypeT}:
     skip c # nilability tag
   elif kind in RoutineTypes:
     skip c # name

@@ -294,7 +294,8 @@ proc classifyType(c: var SemContext; n: Cursor): TypeKind =
   result = typeKind(n)
 
 proc declareResult(c: var SemContext; dest: var TokenBuf; info: PackedLineInfo): SymId =
-  if c.routine.kind in {ProcY, FuncY, ConverterY, MethodY, MacroY} and
+  if (c.routine.kind in {ProcY, FuncY, ConverterY, MethodY, MacroY} or
+      (c.routine.kind == IteratorY and ClosureP in c.routine.pragmas)) and
       classifyType(c, c.routine.returnType) != VoidT:
     let name = pool.strings.getOrIncl("result")
     result = identToSym(c, name, ResultY)
@@ -1682,11 +1683,11 @@ proc semPragmas(c: var SemContext; dest: var TokenBuf; n: var Cursor; crucial: v
   var pragmaOpen = false
   let info = n.info
   if n.kind == DotToken or n.substructureKind == PragmasU:
-    if AutoClosuresFeature in c.features and kind in {ProcY, MethodY, FuncY, ConverterY}:
+    if AutoClosuresFeature in c.features and kind in {ProcY, MethodY, FuncY, ConverterY, IteratorY}:
       var isAutoClosure = false
       var it = c.routine.parent
       while it != nil:
-        if it.kind in {ProcY, MethodY, FuncY, ConverterY}:
+        if it.kind in {ProcY, MethodY, FuncY, ConverterY, IteratorY}:
           isAutoClosure = true
           break
         it = it.parent
@@ -5892,7 +5893,7 @@ proc semExpr(c: var SemContext; dest: var TokenBuf; it: var Item; flags: set[Sem
         of IntT, FloatT, CharT, BoolT, UIntT, VoidT, NiltT, AutoT, SymKindT,
             PtrT, RefT, MutT, OutT, LentT, SinkT, UarrayT, SetT, StaticT, TypedescT,
             TupleT, ArrayT, RangetypeT, VarargsT, UntypedT, TypedT,
-            CstringT, PointerT, TypeKindT, OrdinalT, RoutineTypes, ItertypeT:
+            CstringT, PointerT, TypeKindT, OrdinalT, RoutineTypes:
           # every valid local type expression
           semLocalTypeExpr c, dest, it
         of OrT, AndT, NotT, InvokeT:

@@ -1032,9 +1032,11 @@ proc gtype(g: var SrcGen, n: var Cursor, c: Context) =
         putWithSpace(g, tkFunc, "func")
       of ProctypeT:
         putWithSpace(g, tkProc, "proc")
+      of ItertypeT:
+        putWithSpace(g, tkProc, "iterator")
       else:
         raiseAssert "cannot happen"
-      let isProctype = n.typeKind == ProctypeT
+      let isProctype = n.typeKind in {ProctypeT, ItertypeT}
       skipToParams n
       if n.substructureKind == ParamsU:
         put(g, tkParLe, "(")

@@ -136,7 +136,7 @@ const
   CallKindsS* = {CallS, CallstrlitS, CmdS, PrefixS, InfixS, HcallS}
   ConvKinds* = {HconvX, ConvX, DconvX, CastX}
   TypeclassKinds* = {ConceptT, TypekindT, OrdinalT, OrT, AndT, NotT}
-  RoutineTypes* = {ProcT, FuncT, IteratorT, TemplateT, MacroT, ConverterT, MethodT, ProctypeT}
+  RoutineTypes* = {ProcT, FuncT, IteratorT, TemplateT, MacroT, ConverterT, MethodT, ProctypeT, ItertypeT}
 
 proc addParLe*[T: TypeKind|SymKind|ExprKind|StmtKind|SubstructureKind|ControlFlowKind|CallConv|PragmaKind](
     dest: var TokenBuf; kind: T; info = NoLineInfo) =
@@ -309,7 +309,7 @@ proc skipToReturnType*(n: var Cursor) =
   ## and the proc-decl-shaped layout (`(proc Name Export Pattern Typevars (params) RetType ...)`).
   let skipKind = n.typeKind
   inc n # skip ParLe
-  if skipKind == ProctypeT:
+  if skipKind in {ProctypeT, ItertypeT}:
     skip n # nilability tag
     skip n # params
   else:

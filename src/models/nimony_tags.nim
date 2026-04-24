@@ -231,7 +231,7 @@ type
     NiltT = (ord(NiltTagId), "nilt")  ## `nilt` type
     ConceptT = (ord(ConceptTagId), "concept")  ## `concept` type: two reserved slots, a typevar symbol and the concept body statements
     DistinctT = (ord(DistinctTagId), "distinct")  ## `distinct` type
-    ItertypeT = (ord(ItertypeTagId), "itertype")  ## `itertype` type
+    ItertypeT = (ord(ItertypeTagId), "itertype")  ## `itertype` type, same as `proctype`
     RangetypeT = (ord(RangetypeTagId), "rangetype")  ## `rangetype` type
     UarrayT = (ord(UarrayTagId), "uarray")  ## `uarray` type
     SetT = (ord(SetTagId), "set")  ## `set` type

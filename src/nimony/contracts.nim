@@ -230,7 +230,7 @@ proc markedAs(t: Cursor; mark: NimonyOther): bool =
     # no base type
     if e.kind != ParRi and e.substructureKind == mark:
       result = true
-  of ProctypeT:
+  of ProctypeT, ItertypeT:
     # New layout: `(proctype <NilTag> (params) RetType <Pragmas>)`. The
     # nilability marker is at slot 0.
     let e = t.firstSon

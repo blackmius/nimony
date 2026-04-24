@@ -204,9 +204,9 @@ proc tr(c: var Context; dest: var TokenBuf; n: var Cursor) =
     case n.stmtKind
     of LocalDecls:
       trLocal c, dest, n
-    of ProcS, FuncS, MacroS, MethodS, ConverterS:
+    of ProcS, FuncS, MacroS, MethodS, ConverterS, IteratorS:
       trProc c, dest, n
-    of IteratorS, TemplateS, TypeS, EmitS, BreakS, ContinueS,
+    of TemplateS, TypeS, EmitS, BreakS, ContinueS,
       ForS, IncludeS, ImportS, FromimportS, ImportExceptS,
       ExportS, CommentS,
       PragmasS:
@@ -343,10 +343,10 @@ proc treProcType(c: var Context; dest: var TokenBuf; n: var Cursor) =
     # type is really a tuple:
     let info = n.info
     copyIntoKind dest, TupleT, info:
-      copyIntoKind dest, ProctypeT, info:
+      copyIntoKind dest, n.typeKind, info:
         dest.addDotToken() # nilability tag
         let inputKind = n.typeKind
-        let isProctypeInput = inputKind == ProctypeT
+        let isProctypeInput = inputKind in {ProctypeT, ItertypeT}
         let usesWrapper = inputKind in RoutineTypes
         if usesWrapper:
           skipToParams n
@@ -371,7 +371,7 @@ proc treProcType(c: var Context; dest: var TokenBuf; n: var Cursor) =
       copyIntoKind dest, RefT, info:
         dest.addSymUse pool.syms.getOrIncl(RootObjName), info
   else:
-    let isProctypeInput = n.typeKind == ProctypeT
+    let isProctypeInput = n.typeKind in {ProctypeT, ItertypeT}
     dest.takeToken n
     if isProctypeInput:
       # new layout: nilability, params, retType, pragmas
@@ -614,7 +614,8 @@ proc genCall(c: var Context; dest: var TokenBuf; n: var Cursor) =
 proc toProcType(c: var Context; dest: var TokenBuf; n: Cursor) =
   var n = n
   let info = n.info
-  copyIntoKind dest, ProctypeT, info:
+  var typ = if n.stmtKind == IteratorS: ItertypeT else: ProctypeT
+  copyIntoKind dest, typ, info:
     dest.addDotToken() # nilability tag
     skipToParams n
     copyIntoKind dest, ParamsU, n.info:
@@ -670,9 +671,9 @@ proc tre(c: var Context; dest: var TokenBuf; n: var Cursor) =
     case n.stmtKind
     of LocalDecls:
       treLocal c, dest, n
-    of ProcS, FuncS, MacroS, MethodS, ConverterS:
+    of ProcS, FuncS, MacroS, MethodS, ConverterS, IteratorS:
       treProcLift c, dest, n
-    of IteratorS, TemplateS, TypeS, EmitS, BreakS, ContinueS,
+    of TemplateS, TypeS, EmitS, BreakS, ContinueS,
       ForS, IncludeS, ImportS, FromimportS, ImportExceptS,
       ExportS, CommentS,
       PragmasS:

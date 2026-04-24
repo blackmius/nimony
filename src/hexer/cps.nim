@@ -288,16 +288,14 @@ proc emitStackFrameTag(c: var Context; dest: var TokenBuf; coroVar: SymId; info:
 proc isProc*(c: var Context; s: SymId): bool =
   let res = tryLoadSym(s)
   if res.status == LacksNothing:
-    result = res.decl.symKind == ProcY
+    result = res.decl.symKind in {ProcY, IteratorY}
   else:
     let info = getLocalInfo(c.typeCache, s)
-    result = info.kind == ProcY
+    result = info.kind in {ProcY, IteratorY}
 
 proc isPassive(c: var Context; s: SymId): bool =
   let typ = c.typeCache.lookupSymbol(s)
-  if not cursorIsNil(typ) and procHasPragma(typ, PassiveP):
-    return true
-  return false
+  return not cursorIsNil(typ) and procHasPragma(typ, PassiveP)
 
 proc getNextState(buf: TokenBuf; n: Cursor): int =
   var pos = cursorToPosition(buf, n)
@@ -1076,7 +1074,11 @@ proc generateCoroutineHelpers(c: var Context; dest: var TokenBuf; sym: SymId; it
 
   var start = dest.len
 
-  dest.takeToken n # ProcS
+  if n.stmtKind == IteratorS:
+    dest.addParLe ProcS, info
+    inc n
+  else:
+    dest.takeToken n # ProcS
   skip n
   dest.addSymDef newSym, info
   dest.takeTree n # 
@@ -1261,10 +1263,11 @@ proc patchParamList(c: var Context; dest, init: var TokenBuf; sym: SymId;
 
 proc trProctype(c: var Context; dest: var TokenBuf; n: var Cursor) =
   if n.kind == ParLe:
-    if n.typeKind == ProctypeT and procHasPragma(n, PassiveP):
+    if n.typeKind in {ProctypeT, ItertypeT} and procHasPragma(n, PassiveP):
       var info = n.info
       # add caller for init function to the params end
-      dest.takeToken n        # proctype tag
+      dest.addToken ProctypeT, info        # proctype tag
+      inc n
       dest.takeTree n         # nilability tag
       dest.takeToken n        # params tag
       while n.kind != ParRi:
@@ -1325,6 +1328,8 @@ proc trCoroutine(c: var Context; dest: var TokenBuf; n: var Cursor; kind: SymKin
       if (kind == IteratorY and hasPragma(n, ClosureP)) or hasPragma(n, PassiveP):
         isCoroutine = true
         c.currentProc.kind = (if kind == IteratorY: IsIterator else: IsPassive)
+        # replace iterator token to proc
+        dest[procStart] = parLeToken(ProcS, iter.info)
         patchParamList c, dest, init, sym, paramsBegin, paramsEnd, origParams
     elif i == TypevarsPos:
       isConcrete = n.substructureKind != TypevarsU
@@ -1520,7 +1525,7 @@ proc tr(c: var Context; dest: var TokenBuf; n: var Cursor) =
         of KillV, UnknownV:
           skip n  # NJ bookkeeping, not needed in CPS output
         else:
-          if n.typeKind == ProctypeT:
+          if n.typeKind in {ProctypeT, ItertypeT}:
             trProctype c, dest, n
           else:
             case pool.tags[n.tagId]
@@ -1552,6 +1557,9 @@ proc generateContinuationProcImpl(): Cursor =
 
 proc transformToCps*(pass: var Pass) =
   var n = pass.n  # Extract cursor locally
+  echo "==========="
+  echo pass.n
+  echo "==========="
   var c = Context(thisModuleSuffix: pass.moduleSuffix,
     typeCache: createTypeCache(), coroTypes: createTokenBuf(10),
     continuationProcImpl: generateContinuationProcImpl())

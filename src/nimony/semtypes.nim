@@ -595,7 +595,7 @@ proc handleNotnilType(c: var SemContext; dest: var TokenBuf; nn: var Cursor; con
 
 proc isPointerTypeClass(n: Cursor): bool {.inline.} =
   result = n.typeKind == TypeKindT and
-    n.firstSon.typeKind in {RefT, PtrT, PointerT, CstringT, ProctypeT}
+    n.firstSon.typeKind in {RefT, PtrT, PointerT, CstringT, ProctypeT, ItertypeT}
 
 proc handleNilableType(c: var SemContext; dest: var TokenBuf; nn: var Cursor; context: TypeDeclContext): bool =
   result = false
@@ -654,7 +654,7 @@ proc handleNilableType(c: var SemContext; dest: var TokenBuf; nn: var Cursor; co
         stripNilAnnotation dest, before
         dest.addParPair annotation, info
         dest.addParRi()
-      elif nd.typeKind == ProctypeT:
+      elif nd.typeKind in {ProctypeT, ItertypeT}:
         dest.endRead()
         # Slot 0 of `(proctype <NilTag> ...)` is the nilability marker. Set
         # it directly — it's either a placeholder dot inserted by
@@ -892,7 +892,7 @@ proc semLocalTypeImpl(c: var SemContext; dest: var TokenBuf; n: var Cursor;
         return
       let tk = typeKind(n)
       takeToken dest, n
-      let isProctype = tk == ProctypeT
+      let isProctype = tk in {ProctypeT, ItertypeT}
       let nilTagPos = dest.len
       var sourceIsNewLayout = false
       if isProctype:
@@ -965,9 +965,6 @@ proc semLocalTypeImpl(c: var SemContext; dest: var TokenBuf; n: var Cursor;
       semInvoke c, dest, n
     of ErrT:
       takeTree dest, n
-    of ItertypeT:
-      c.buildErr dest, info, "itertype not supported"
-      skip n
   of DotToken:
     if context in {InReturnTypeDecl, InGenericConstraint}:
       takeToken dest, n

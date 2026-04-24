@@ -418,7 +418,7 @@ proc markedAs(t: Cursor; mark: NimonyOther): bool =
     # no base type
     if e.kind != ParRi and e.substructureKind == mark:
       result = true
-  of ProctypeT:
+  of ProctypeT, ItertypeT:
     # New layout: `(proctype <NilTag> (params) RetType <Pragmas>)`. The
     # nilability marker is at slot 0.
     let e = t.firstSon
@@ -1129,7 +1129,7 @@ proc traverseLocal(c: var NjvlContext; n: var Cursor) =
     elif path.mode == NotBorrowable:
       buildErr c, n.info, "cannot borrow from '" & asNimCode(inner) &
         "': path is not borrowable; use 'addr' to override or a temporary move"
-  if n.kind != DotToken and localType.typeKind in {PtrT, RefT, CstringT, PointerT, ProctypeT}:
+  if n.kind != DotToken and localType.typeKind in {PtrT, RefT, CstringT, PointerT, ProctypeT, ItertypeT}:
     checkNilMatch c, n, localType
   traverseExpr c, n
   skipParRi n
