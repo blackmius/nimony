@@ -75,6 +75,12 @@ var gReactorWaits* = false
   ## to do the sleeping itself, because a reactor that only peeks would
   ## otherwise leave the loop spinning on a core.
 var threadIdx* {.threadvar.}: int
+var isWorker {.threadvar.}: bool
+  ## True only on a thread created by `initPool`; the main thread is not one.
+var isHelper {.threadvar.}: bool
+  ## True on a non-worker thread that called `runForever`. Such a thread owns
+  ## the reserved helper I/O lane; every other non-worker shares the trailing
+  ## foreign lane.
 
 template countMetric(counter: untyped; n = 1) =
   ## Bump one of this thread's counters — only when the build asked for them.
@@ -86,7 +92,7 @@ template countMetric(counter: untyped; n = 1) =
   ## `workerMetrics`; without it the table stays empty and the argument — an
   ## index into it — is not even looked at.
   when defined(threadpoolMetrics):
-    inc counter, uint(n)
+    if isWorker: inc counter, uint(n)
 
 # --- Submit / dequeue ---
 
@@ -157,7 +163,8 @@ type
 
 var
   staged {.threadvar.}: StagedTasks
-  isWorker {.threadvar.}: bool # only workers may stage; foreign threads must enqueue directly or their batch could never be flushed
+  # `isWorker` is declared next to `threadIdx`: only workers may stage;
+  # foreign threads must enqueue directly or their batch could never be flushed.
 
 proc stageTask(t: Task): bool {.inline.} =
   ## Push onto this worker's private ring; false when it is full.
@@ -411,10 +418,45 @@ proc isPoolWorker*(): bool {.inline.} =
   ## Anything that indexes per-thread state by `threadIdx` must ask this first.
   isWorker
 
+proc isPoolHelper*(): bool {.inline.} =
+  ## True on a non-worker thread that entered `runForever`. The I/O ring gives
+  ## that thread its own reserved lane (`ioLane`), separate from both the
+  ## workers and the shared lane of occasional foreign submitters.
+  isHelper
+
 proc stopped*(): bool {.inline.} =
   atomicLoad(stopFlag, moRelaxed)
 
-proc shutdownPool*() =
+proc runForever*() =
+  ## Make the calling thread a pool participant and stay there: run queued
+  ## tasks, drive this thread's I/O lane and sleep when there is nothing to
+  ## do. Returns only after the pool is stopped.
+  ##
+  ## This is the replacement for a program whose main thread starts a server
+  ## and then has nothing to do:
+  ##
+  ## ```nim
+  ## startServer()
+  ## runForever()      # instead of `while true: sleep(1000)`
+  ## ```
+  ##
+  ## The main thread is not one of `workerCount`; it joins through the shared
+  ## trailing I/O lane (`ioLane`), so `workCycle` here drains tasks and polls
+  ## that lane exactly as a worker would. Called on a pool worker it returns
+  ## immediately (the worker is already inside `workerLoop`).
+  initPool()
+  if isWorker: return
+  isHelper = true
+  while not stopped():
+    discard workCycle(0)
+
+proc stopPool*() =
+  ## Ask every worker and `runForever` to stop without joining anybody. Useful
+  ## from a task or a signal handler, where joining would deadlock; the owner
+  ## of the pool calls `shutdownPool` afterwards to wait for the threads.
   atomicStore(stopFlag, true, moRelaxed)
+
+proc shutdownPool*() =
+  stopPool()
   for i in 0 ..< workerCount:
     workers[i].join()

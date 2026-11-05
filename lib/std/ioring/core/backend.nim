@@ -42,10 +42,17 @@ type
       ## OS already tears this down on close (kqueue) — callers
       ## must nil-check before calling.
 
+var isRingOwner {.threadvar.}: bool
+  ## True on the one non-worker thread that called `initIoRing` (normally
+  ## main). It owns the reserved lane; every other foreign thread shares the
+  ## trailing one. Set at ring setup, so the owner's lane never changes when
+  ## it later calls `runForever`.
+
 proc ioLanes*(): int {.inline.} =
-  ## Number of independent I/O lanes: one per pool worker, plus one trailing
-  ## lane shared by every non-worker submitter.
-  workerCount + 1
+  ## Number of independent I/O lanes: one per pool worker, plus one reserved
+  ## lane for the ring-owner thread (normally main), plus one trailing lane
+  ## shared by every other non-worker submitter.
+  workerCount + 2
 
 proc ioLane*(): int {.inline.} =
   ## The lane this thread owns. Every piece of per-thread ring state (the
@@ -57,11 +64,16 @@ proc ioLane*(): int {.inline.} =
   ## reported the same index as worker 0 and the two drove one unlocked arena
   ## and one single-producer io_uring submission ring in parallel.
   ##
-  ## Caveat: all non-worker threads share the trailing lane, so the ring still
-  ## supports only *one* foreign submitter at a time (the usual "main thread
-  ## drives the ring" shape). Ops submitted on that lane are drained by that
-  ## thread's own `poll`, i.e. by its `waitCompletions`/`pollCompletions` loop.
-  if isPoolWorker(): threadIdx else: workerCount
+  ## The ring-owner thread (the one that called `initIoRing`, normally main)
+  ## owns the reserved lane whether it is merely waiting in `complete` or is
+  ## inside `runForever`; the lane therefore never changes under parked ops.
+  ## Every other non-worker shares the trailing lane: the ring still supports
+  ## only *one* such submitter at a time. Ops submitted on a lane are drained
+  ## by that thread's own `poll`, i.e. by its
+  ## `waitCompletions`/`pollCompletions` loop.
+  if isPoolWorker(): threadIdx
+  elif isRingOwner: workerCount
+  else: workerCount + 1
 
 type
   OpQueue* = object
